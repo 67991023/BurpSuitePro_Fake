@@ -1,0 +1,1 @@
+// go mod init openburp => สร้างไฟล์ go.mod คอยบันทึกว่าเราใช้ Library อะไรบ้าง

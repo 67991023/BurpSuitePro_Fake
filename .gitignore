@@ -1,0 +1,14 @@
+# --- Security: ห้ามเอา Key ขึ้นเด็ดขาด ---
+*.key
+*.crt
+*.pem
+
+# --- Go Binaries: ไม่เอาไฟล์ .exe ขึ้น ---
+*.exe
+*.dll
+*.so
+*.dylib
+openburp
+
+# --- IDE Config: ไม่เอาไฟล์ตั้งค่า VS Code ขึ้น ---
+.vscode/
