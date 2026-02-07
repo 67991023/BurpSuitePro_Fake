@@ -1,8 +1,24 @@
 /*
 สาเหตุจำเป็นต้องเป็น CA เพื่อสร้าง certificate ปลอม สำหรับเข้าถึง https
+รันเเค่ครั้งเเรกเพื่อสร้าง ca.key สำหรับประทับตราอนุมัติ" ลงบนบัตรประชาชน (Certificate) ของคนอื่น เพื่อยืนยันว่า "ฉันรับรองคนนี้
+เเละสร้าง ca.crt เพื่อเป็นใบเซอร์เอาไว้แจกชาวบ้าน (Browser) เพื่อบอกว่า "ตราประทับหน้าตาแบบนี้ คือตราของฉันนะ ถ้าเห็นตรานี้บนบัตรใคร ให้เชื่อถือได้เลย
+ในโปรเจกต์นี้: เราเอา ca.crt ไปติดตั้งใน Chrome/Firefox เพื่อบอก Browser ว่า "จงเชื่อถือตราประทับของ Burp_Project นะ"
+
+สถานการณ์เมื่อใช้ Burp_Project (มี ca.crt/ca.key)
+
+	Browser: "ขอคุยกับ Google หน่อย" (ส่งไปหา Proxy)
+	Burp_Project (Proxy): "หยุดก่อน! Browser รอเดี๋ยว..."
+	Burp_Project: (แอบสร้างบัตรประชาชนปลอม เขียนชื่อว่า google.com)
+	Burp_Project: (ใช้ ca.key ประทับตราลงบนบัตรปลอมใบนั้น) ปึ้ง!
+	Burp_Project: ส่งบัตรปลอมกลับไปให้ Browser -> "อ่ะ นี่ Google เองจ้ะ"
+	Browser: (ตรวจสอบบัตร) "เอ๊ะ! บัตรนี้ถูกประทับตราโดย Burp_Project Root CA ... ฉันรู้จักไหมนะ?"
+	    ถ้าคุณยังไม่ลง ca.crt: Browser จะตะโกนว่า "ไม่ปลอดภัย! (Certificate Error)" เพราะไม่รู้จักคนประทับตรา
+	    ถ้าคุณลง ca.crt แล้ว: Browser จะบอกว่า "อ๋อ! ตราประทับของ Burp_Project นี่เอง ฉันถูกสั่งให้เชื่อถือเจ้านี้ งั้นคุยต่อได้เลย"
+	ผลลัพธ์: Browser ยอมส่งข้อมูลให้คุณ (Proxy) -> คุณถอดรหัสอ่านได้ -> แล้วค่อยส่งต่อให้ Google จริงๆ
 */
 package main
 
+/*
 import (
 	"crypto/rand"
 	"crypto/rsa"
@@ -57,3 +73,11 @@ func main() {
 
 	log.Println("✅ สร้างไฟล์ ca.crt และ ca.key เรียบร้อย!")
 }
+
+/*
+หลังจากได้ ca.crt เเล้ว ต้อง ติดตั้ง CA ลงเครื่อง (Install Trust)
+Firefox:
+    Settings -> Search "Certificates" -> View Certificates
+    Tab "Authorities" -> Import... -> เลือก ca.crt
+    ติ๊กถูก "Trust this CA to identify websites" -> OK
+*/
