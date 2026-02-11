@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OpenBurp Dashboard</title>
+    <style>
+        body { background-color: #1e1e1e; color: #00ff00; font-family: monospace; padding: 20px; }
+        h1 { border-bottom: 1px solid #333; padding-bottom: 10px; }
+        #logs { 
+            height: 500px; 
+            overflow-y: scroll; 
+            border: 1px solid #444; 
+            padding: 10px; 
+            background: #000;
+        }
+        .entry { margin-bottom: 5px; border-bottom: 1px dashed #333; padding: 5px; }
+        .method { color: #ffeb3b; font-weight: bold; }
+        .url { color: #4fc3f7; }
+    </style>
+</head>
+<body>
+    <h1>🚀 OpenBurp Dashboard (Phase 2)</h1>
+    <div id="status">🔴 Disconnected...</div>
+    <div id="logs"></div>
+
+    <script>
+        // 1. เชื่อมต่อ WebSocket ไปที่ Go Server (Port 8081)
+        const ws = new WebSocket("ws://localhost:8081/ws");
+
+        const statusDiv = document.getElementById("status");
+        const logsDiv = document.getElementById("logs");
+
+        // 2. เมื่อเชื่อมต่อสำเร็จ
+        ws.onopen = () => {
+            statusDiv.innerHTML = "🟢 Connected to OpenBurp Engine!";
+            statusDiv.style.color = "#00ff00";
+        };
+
+        // 3. เมื่อมีข้อมูลส่งมาจาก Go
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data); // แปลงข้อความกลับเป็น Object
+            
+            // สร้างบรรทัดใหม่
+            const div = document.createElement("div");
+            div.className = "entry";
+            div.innerHTML = `<span class="method">[${data.method}]</span> <span class="url">${data.url}</span>`;
+            
+            // ยัดใส่กล่อง logs
+            logsDiv.appendChild(div);
+            
+            // เลื่อน Scrollbar ลงล่างสุดเสมอ
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        };
+        
+        ws.onclose = () => {
+            statusDiv.innerHTML = "🔴 Connection Lost";
+            statusDiv.style.color = "red";
+        }
+    </script>
+</body>
+</html>
