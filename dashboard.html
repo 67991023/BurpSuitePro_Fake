@@ -4,58 +4,153 @@
     <meta charset="UTF-8">
     <title>OpenBurp Dashboard</title>
     <style>
-        body { background-color: #1e1e1e; color: #00ff00; font-family: monospace; padding: 20px; }
-        h1 { border-bottom: 1px solid #333; padding-bottom: 10px; }
-        #logs { 
-            height: 500px; 
-            overflow-y: scroll; 
-            border: 1px solid #444; 
-            padding: 10px; 
-            background: #000;
-        }
-        .entry { margin-bottom: 5px; border-bottom: 1px dashed #333; padding: 5px; }
-        .method { color: #ffeb3b; font-weight: bold; }
-        .url { color: #4fc3f7; }
+        body { font-family: 'Consolas', monospace; background: #1e1e1e; color: #d4d4d4; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { background: #333; padding: 10px; display: flex; gap: 20px; border-bottom: 2px solid #007acc; }
+        button { background: #444; color: white; border: none; padding: 8px 16px; cursor: pointer; }
+        button:hover { background: #555; }
+        button.active { background: #007acc; }
+        
+        /* Layout */
+        .tab-content { display: none; flex: 1; padding: 10px; overflow: hidden; }
+        .tab-content.active { display: flex; }
+
+        /* Logger Tab */
+        #log-container { width: 100%; height: 100%; overflow-y: scroll; background: #252526; padding: 10px; border: 1px solid #333; }
+        .log-entry { padding: 5px; border-bottom: 1px solid #333; font-size: 14px; }
+        .log-method { font-weight: bold; color: #569cd6; }
+        .log-url { color: #ce9178; }
+        .log-vuln { color: #f44747; font-weight: bold; background: #3c0000; }
+
+        /* Repeater Tab */
+        #repeater-layout { display: flex; width: 100%; gap: 10px; height: 100%; }
+        .panel { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+        textarea { background: #2d2d2d; color: #d4d4d4; border: 1px solid #3e3e42; flex: 1; font-family: monospace; padding: 10px; resize: none; }
+        input { background: #3c3c3c; color: white; border: 1px solid #555; padding: 5px; }
+        #send-btn { background: #4ec9b0; color: black; font-weight: bold; padding: 10px; }
+        
+        /* History List (Left Sidebar for Repeater) */
+        #history-list { width: 200px; background: #252526; overflow-y: auto; border-right: 1px solid #444; }
+        .history-item { padding: 5px; cursor: pointer; border-bottom: 1px solid #333; font-size: 12px; }
+        .history-item:hover { background: #333; }
     </style>
 </head>
 <body>
-    <h1>🚀 OpenBurp Dashboard (Phase 2)</h1>
-    <div id="status">🔴 Disconnected...</div>
-    <div id="logs"></div>
 
-    <script>
-        // 1. เชื่อมต่อ WebSocket ไปที่ Go Server (Port 8081)
-        const ws = new WebSocket("ws://localhost:8081/ws");
+<header>
+    <h2 style="margin:0;">🔥 OpenBurp</h2>
+    <button onclick="showTab('logger')" class="active" id="btn-logger">📡 Live Traffic</button>
+    <button onclick="showTab('repeater')" id="btn-repeater">🔁 Repeater (Manual)</button>
+</header>
 
-        const statusDiv = document.getElementById("status");
-        const logsDiv = document.getElementById("logs");
+<div id="logger" class="tab-content active">
+    <div id="log-container"></div>
+</div>
 
-        // 2. เมื่อเชื่อมต่อสำเร็จ
-        ws.onopen = () => {
-            statusDiv.innerHTML = "🟢 Connected to OpenBurp Engine!";
-            statusDiv.style.color = "#00ff00";
-        };
+<div id="repeater" class="tab-content">
+    <div id="history-list">
+        </div>
+    <div id="repeater-layout">
+        <div class="panel">
+            <h3>Request</h3>
+            <div style="display:flex; gap:5px;">
+                <select id="req-method" style="background:#333; color:white;">
+                    <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+                </select>
+                <input type="text" id="req-url" placeholder="http://target.com" style="flex:1;">
+            </div>
+            <textarea id="req-headers" placeholder="Header: Value (One per line)">User-Agent: OpenBurp/1.0</textarea>
+            <textarea id="req-body" placeholder="Request Body (JSON/Form)"></textarea>
+            <button id="send-btn" onclick="sendRequest()">🚀 SEND REQUEST</button>
+        </div>
+        <div class="panel">
+            <h3>Response</h3>
+            <div id="resp-meta" style="padding:5px; background:#333;">Status: - | Time: -</div>
+            <textarea id="resp-body" readonly></textarea>
+        </div>
+    </div>
+</div>
 
-        // 3. เมื่อมีข้อมูลส่งมาจาก Go
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data); // แปลงข้อความกลับเป็น Object
-            
-            // สร้างบรรทัดใหม่
-            const div = document.createElement("div");
-            div.className = "entry";
-            div.innerHTML = `<span class="method">[${data.method}]</span> <span class="url">${data.url}</span>`;
-            
-            // ยัดใส่กล่อง logs
-            logsDiv.appendChild(div);
-            
-            // เลื่อน Scrollbar ลงล่างสุดเสมอ
-            logsDiv.scrollTop = logsDiv.scrollHeight;
-        };
+<script>
+    // --- WebSocket Logger ---
+    const ws = new WebSocket("ws://" + window.location.host + "/ws");
+    const logContainer = document.getElementById("log-container");
+
+    ws.onmessage = function(event) {
+        const msg = JSON.parse(event.data);
+        const div = document.createElement("div");
+        div.className = "log-entry";
+        if (msg.method.includes("🔥")) div.className += " log-vuln"; // Highlight Vuln
+
+        div.innerHTML = `<span class="log-method">[${msg.method}]</span> <span class="log-url">${msg.url}</span> <br> <small>${msg.body}</small>`;
+        logContainer.prepend(div);
         
-        ws.onclose = () => {
-            statusDiv.innerHTML = "🔴 Connection Lost";
-            statusDiv.style.color = "red";
-        }
-    </script>
+        // Auto add to history UI if needed (simple version)
+        loadHistory(); 
+    };
+
+    // --- Tabs ---
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.querySelectorAll('header button').forEach(el => el.classList.remove('active'));
+        document.getElementById('btn-' + tabId).classList.add('active');
+        
+        if(tabId === 'repeater') loadHistory();
+    }
+
+    // --- Repeater Logic ---
+    function loadHistory() {
+        fetch('/api/history')
+            .then(res => res.json())
+            .then(data => {
+                const list = document.getElementById('history-list');
+                list.innerHTML = "";
+                // Show latest first
+                data.reverse().forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'history-item';
+                    div.innerText = `[${item.method}] ${item.url.substring(0, 30)}...`;
+                    div.onclick = () => loadIntoRepeater(item);
+                    list.appendChild(div);
+                });
+            });
+    }
+
+    function loadIntoRepeater(item) {
+        document.getElementById('req-method').value = item.method;
+        document.getElementById('req-url').value = item.url;
+        document.getElementById('req-headers').value = item.headers;
+        document.getElementById('req-body').value = item.body;
+    }
+
+    function sendRequest() {
+        const btn = document.getElementById('send-btn');
+        btn.innerText = "⏳ Sending...";
+        
+        const payload = {
+            method: document.getElementById('req-method').value,
+            url: document.getElementById('req-url').value,
+            headers: document.getElementById('req-headers').value,
+            body: document.getElementById('req-body').value
+        };
+
+        fetch('/api/repeat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('resp-meta').innerText = `Status: ${data.status} | Time: ${data.timeTaken}`;
+            document.getElementById('resp-body').value = data.body; // In real world, might need beautify
+            btn.innerText = "🚀 SEND REQUEST";
+        })
+        .catch(err => {
+            document.getElementById('resp-body').value = "Error: " + err;
+            btn.innerText = "🚀 SEND REQUEST";
+        });
+    }
+</script>
+
 </body>
 </html>

@@ -244,6 +244,15 @@ func handleHTTPS(w http.ResponseWriter, r *http.Request, caCert tls.Certificate)
 			}
 		}()
 
+		if !isIgnored(r.Host) {
+			headersDump := ""
+			for k, v := range req.Header {
+				headersDump += k + ": " + v[0] + "\n"
+			}
+			fullURL := "https://" + r.Host + req.URL.Path
+			go SaveTraffic(req.Method, fullURL, headersDump, "(Encrypted Body)")
+		}
+
 		// C. ACTIVE SCANNER: เฉพาะเว็บที่เป็น Target เท่านั้น
 		if strings.Contains(hostName, targetDomain) && req.Method == "GET" && len(req.URL.Query()) > 0 {
 			targetURL := "https://" + hostName + req.URL.Path + "?" + req.URL.RawQuery
@@ -289,6 +298,15 @@ func handleHTTP(w http.ResponseWriter, r *http.Request) {
 		forwardHTTP(w, r)
 		return
 	}
+
+	// --- ➕ เพิ่มการบันทึก History ---
+	// (อ่าน Body อาจจะยากหน่อยเพราะมันเป็น Stream แต่เอา Header/URL ก่อน)
+	headersDump := ""
+	for k, v := range r.Header {
+		headersDump += k + ": " + v[0] + "\n"
+	}
+	go SaveTraffic(r.Method, r.URL.String(), headersDump, "(Body logging disabled for speed)")
+	// -----------------------------
 
 	// B. DASHBOARD LOG
 	go func() {
@@ -352,6 +370,10 @@ func startDashboardServer() {
 		http.ServeFile(w, r, "dashboard.html")
 	})
 	mux.HandleFunc("/ws", handleWebSocket)
+
+	mux.HandleFunc("/api/history", handleHistoryAPI) // ดูประวัติ
+	mux.HandleFunc("/api/repeat", handleRepeaterAPI) // ยิง Repeater
+
 	log.Fatal(http.ListenAndServe(":8081", mux))
 }
 
